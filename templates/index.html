@@ -1,0 +1,154 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>インタラクティブホテル価格比較</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: "Hiragino Sans", "Meiryo", "Yu Gothic", sans-serif;
+            max-width: 1200px;
+            margin: auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+        }
+        #chart {
+            height: 600px;
+        }
+        .form-area {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        input[type="date"] {
+            padding: 6px;
+            font-size: 14px;
+            margin: 0 10px;
+        }
+        button {
+            padding: 6px 12px;
+            font-size: 14px;
+        }
+        fieldset {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+        label {
+            margin-right: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>小樽のホテル価格推移（180日間・インタラクティブ）</h1>
+
+    <!-- ✅ 日付指定フォーム -->
+    <div class="form-area">
+        <label>開始日: <input type="date" id="startDate"></label>
+        <label>終了日: <input type="date" id="endDate"></label>
+        <button onclick="filterData()">表示</button>
+    </div>
+
+    <!-- ✅ ホテルチェックボックス -->
+    <div class="form-area">
+        <fieldset id="hotelCheckboxes" style="text-align:left; max-width:800px; margin: auto;">
+            <legend>表示するホテルを選択：</legend>
+            <!-- JavaScriptでチェックボックスが追加されます -->
+        </fieldset>
+    </div>
+
+    <!-- ✅ グラフ描画エリア -->
+    <div id="chart"></div>
+
+    <script>
+    let allData = {};
+    let dateList = [];
+
+    // JSON取得と初期処理
+    fetch("/data")
+        .then(response => response.json())
+        .then(data => {
+            allData = data;
+            dateList = Object.keys(Object.values(data)[0]);
+
+            // チェックボックス生成
+            const checkboxArea = document.getElementById("hotelCheckboxes");
+            for (const hotel of Object.keys(data)) {
+                const id = "chk_" + hotel.replace(/\s+/g, "_");
+                const box = document.createElement("input");
+                box.type = "checkbox";
+                box.id = id;
+                box.name = "hotel";
+                box.value = hotel;
+                box.checked = true;
+                checkboxArea.appendChild(box);
+
+                const label = document.createElement("label");
+                label.htmlFor = id;
+                label.innerText = hotel;
+                checkboxArea.appendChild(label);
+                checkboxArea.appendChild(document.createElement("br"));
+            }
+
+            // 開始日・終了日 初期値設定
+            document.getElementById("startDate").value = dateList[0];
+            document.getElementById("endDate").value = dateList[dateList.length - 1];
+
+            // 初期描画（全期間）
+            plotGraph(dateList[0], dateList[dateList.length - 1]);
+        });
+
+    // グラフ描画関数
+    function plotGraph(startDate, endDate) {
+        const traces = [];
+        const startIndex = dateList.indexOf(startDate);
+        const endIndex = dateList.indexOf(endDate);
+
+        if (startIndex === -1 || endIndex === -1 || startIndex > endIndex) {
+            alert("有効な日付範囲を選択してください");
+            return;
+        }
+
+        const selectedDates = dateList.slice(startIndex, endIndex + 1);
+
+        // ✅ チェックされたホテルだけ抽出
+        const checkedHotels = Array.from(document.querySelectorAll('input[name="hotel"]:checked'))
+                                   .map(cb => cb.value);
+
+        for (const [hotel, prices] of Object.entries(allData)) {
+            if (!checkedHotels.includes(hotel)) continue;
+            const y = selectedDates.map(d => prices[d] || null);
+            traces.push({
+                x: selectedDates,
+                y: y,
+                mode: 'lines+markers',
+                name: hotel,
+                hovertemplate: `${hotel}<br>%{x}<br>¥%{y}<extra></extra>`
+            });
+        }
+
+        const layout = {
+            title: `ホテル価格推移 (${startDate}〜${endDate})`,
+            xaxis: { title: '日付', tickangle: -45 },
+            yaxis: { title: '価格（円）' },
+            hovermode: 'closest'
+        };
+
+        Plotly.newPlot('chart', traces, layout);
+    }
+
+    // 表示ボタン押下時
+    function filterData() {
+        const start = document.getElementById("startDate").value;
+        const end = document.getElementById("endDate").value;
+        if (!start || !end) {
+            alert("開始日と終了日を選択してください。");
+            return;
+        }
+        plotGraph(start, end);
+    }
+    </script>
+</body>
+</html>
+
