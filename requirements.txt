@@ -1,0 +1,4 @@
+Flask
+matplotlib
+jpholiday
+requests
