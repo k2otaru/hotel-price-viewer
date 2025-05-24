@@ -37,14 +37,15 @@ price_data = {}
 for hotel in hotels:
     hotel_name = hotel["name"]
     hotel_no = hotel["hotel_no"]
-    print(f"取得中：{hotel_name}")
+    print(f"📥 取得開始：{hotel_name}")
     price_data[hotel_name] = {}
 
     for d in dates:
+        date_str = d.strftime("%Y-%m-%d")
         params = {
             "applicationId": APP_ID,
             "hotelNo": hotel_no,
-            "checkinDate": d.strftime("%Y-%m-%d"),
+            "checkinDate": date_str,
             "checkoutDate": (d + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
             "adultNum": 1,
             "format": "json"
@@ -66,26 +67,34 @@ for hotel in hotels:
                                     if charge:
                                         prices.append(charge)
 
-                price_data[hotel_name][d.strftime("%Y-%m-%d")] = min(prices) if prices else None
+                min_price = min(prices) if prices else None
+                price_data[hotel_name][date_str] = min_price
+                print(f"✅ {hotel_name} {date_str} 最安値: {min_price if min_price else 'なし'}")
             else:
-                price_data[hotel_name][d.strftime("%Y-%m-%d")] = None
+                print(f"⚠️ {hotel_name} {date_str} 取得失敗（status: {response.status_code}）")
+                price_data[hotel_name][date_str] = None
+
         except Exception as e:
-            print(f"エラー: {e}")
-            price_data[hotel_name][d.strftime("%Y-%m-%d")] = None
+            print(f"❌ {hotel_name} {date_str} エラー: {e}")
+            price_data[hotel_name][date_str] = None
 
         time.sleep(1)
 
 # JSONとして保存
-with open("data/prices.json", "w", encoding="utf-8") as jf:
+json_path = "data/prices.json"
+with open(json_path, "w", encoding="utf-8") as jf:
     json.dump(price_data, jf, ensure_ascii=False, indent=2)
+print(f"💾 JSON保存完了：{json_path}（ホテル数: {len(price_data)}）")
 
-# CSVとして保存（行：日付・ホテル名・価格）
-with open("data/prices.csv", "w", newline="", encoding="utf-8") as cf:
+# CSVとして保存
+csv_path = "data/prices.csv"
+with open(csv_path, "w", newline="", encoding="utf-8") as cf:
     writer = csv.writer(cf)
     writer.writerow(["date", "hotel_name", "price"])
     for hotel_name, date_prices in price_data.items():
         for date, price in date_prices.items():
             writer.writerow([date, hotel_name, price])
+print(f"💾 CSV保存完了：{csv_path}（行数: {sum(len(v) for v in price_data.values())}）")
 
-print("✅ 価格データの取得と保存が完了しました。（data/prices.json, data/prices.csv）")
+print("✅ 価格データの取得と保存がすべて完了しました。")
 
